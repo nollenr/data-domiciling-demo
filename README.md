@@ -38,7 +38,7 @@ AWS EC2 Hosted 9 Node, 3 Region Cluster with 3 nodes in each region, all nodes i
 ![NodeMap](NodeMap.JPG)
 
 ## Enable the Node Map in the DB Console
-The data you enter here, must map to the localities you used when starting each node.  If you are using CockroachDB Dedicated, you do not need to perform this step.    These are the localities I used for 
+The data you enter here, must map to the localities you used when starting each node.  If you are using CockroachDB Dedicated, you do not need to perform this step.    These are the localities I used when starting the nodes in the cluster.  
 ```
 INSERT into system.locations VALUES ('region', 'aws-us-east-1', 37.478397, -76.453077);
 INSERT into system.locations VALUES ('region', 'aws-us-east-2', 40.417287, -76.453077);
@@ -60,7 +60,7 @@ INSERT into system.locations VALUES ('region', 'aws-sa-east-1', -23.55052, -46.6
 
 
 ## Licenses and Cluster Settings
-In order to use multi-region you'll to be running enterprise edition.  If you're using CockroachDB Dedicated or Serverless, these will be automatically set for you.  If you're self-hosting the cluster, then you need to update your cluster settings.    The cluster settings are not necessarily "production settings", but great for a demo.  
+In order to use multi-region you'll need to be running enterprise edition.  If you're using CockroachDB Dedicated or Serverless, these will be automatically set for you.  If you're self-hosting the cluster, then you need to update your cluster settings.    The cluster settings are not necessarily "production settings", but great for a demo.  
 ```
 SET CLUSTER SETTING cluster.organization = {your org};
 SET CLUSTER SETTING enterprise.license = {your license};
@@ -143,7 +143,7 @@ from crdb_internal.ranges where table_id = (
 |             3 | {1,2,3,6,8} | {3,1,2}         | {8,6}|
 
 
-Notice that there are ranges in all regions of the cluster.  Whenever you read from a global table, the read will be from a "local" replica -- a follower read. Therefore reads of a global table will always be fast in CockroachDB, however write will be very slow.   
+Notice that there are ranges in all regions of the cluster.  Whenever you read from a global table, the read will be from a "local" replica -- a follower read. Therefore reads of a global table will always be fast in CockroachDB, however write will be very slow.   Reads from Global Tables are always current.
 
 Let's read this table from across the different nodes of the cluster
 
@@ -469,6 +469,7 @@ from users where first_name = 'Ron';
 
 ## Backup and Restore Domiclied Data
 ### Backups
+```
 BACKUP INTO (
     's3://nollen-cluster-backup-bucket/aws-default-location-folder/?COCKROACH_LOCALITY=default&AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}', 
     's3://nollen-cluster-backup-bucket/aws-ap-southeast-1-folder/?COCKROACH_LOCALITY=region=aws-ap-southeast-1&AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
@@ -476,14 +477,17 @@ BACKUP INTO (
     's3://nollen-cluster-backup-bucket/aws-us-west-2-folder/?COCKROACH_LOCALITY=region=aws-us-west-2&AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}'
     )
     AS OF SYSTEM TIME '-60s';
+```
 
 ### Restore
+```
 RESTORE FROM LATEST IN (
     's3://nollen-cluster-backup-bucket/aws-default-location-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}', 
     's3://nollen-cluster-backup-bucket/aws-ap-southeast-1-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
     's3://nollen-cluster-backup-bucket/aws-eu-central-1-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
     's3://nollen-cluster-backup-bucket/aws-us-west-2-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}'
     );
+```
 
 # Limitations
 ## Indexes
@@ -503,31 +507,6 @@ update users set national_id = '600-00-0000' where id = 'aa4a7222-6962-44ad-ad90
 update users set national_id = '700-00-0000' where id = '88404e06-91d2-465d-ae41-d1a7d4b4abc9';
 update users set national_id = '800-00-0000' where id = 'e6fe85c3-1113-4614-b73b-8f36f67e19f9';
 update users set national_id = '900-00-0000' where id = '2d7be3f4-f104-482e-8a47-b2b9e811ccd8';
-```
-
-Data Backed Up As:
-```
-BACKUP db_with_abstractions.users INTO (
-    's3://nollen-cluster-backup-bucket/users-mr/aws-default-location-folder/?COCKROACH_LOCALITY=default&AWS_ACCESS_KEY_ID={id}&AWS_SECRET_ACCESS_KEY={secret}', 
-    's3://nollen-cluster-backup-bucket/users-mr/aws-ap-southeast-1-folder/?COCKROACH_LOCALITY=region=aws-ap-southeast-1&AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
-    's3://nollen-cluster-backup-bucket/users-mr/aws-eu-central-1-folder/?COCKROACH_LOCALITY=region=aws-eu-central-1&AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
-    's3://nollen-cluster-backup-bucket/users-mr/aws-us-west-2-folder/?COCKROACH_LOCALITY=region=aws-us-west-2&AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}'
-    )
-    AS OF SYSTEM TIME '-60s';
-```
-
-Data Restored As
-```
-drop table  users;
-
-RESTORE table db_with_abstractions.users FROM LATEST IN (
-    's3://nollen-cluster-backup-bucket/users-mr/aws-default-location-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}', 
-    's3://nollen-cluster-backup-bucket/users-mr/aws-ap-southeast-1-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
-    's3://nollen-cluster-backup-bucket/users-mr/aws-eu-central-1-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}',
-    's3://nollen-cluster-backup-bucket/users-mr/aws-us-west-2-folder/?AWS_ACCESS_KEY_ID={ID}&AWS_SECRET_ACCESS_KEY={secret}'
-    );
-
-select crdb_region, count(*) from users group by crdb_region;
 ```
 
 ### Create Index
@@ -570,7 +549,7 @@ and   index_name    = 'data_domiciling_violation'
 |  /Table/110/8/"\x80"            | /Table/110/8/"\x80"/PrefixEnd  | {1,2,3}  | {2,3,1}         |            1 |  107869433|
 |  /Table/110/8/"\x80"/PrefixEnd  | /Max                           | {1,2,3}  | {2,3,1}         |            1 |          0|
 
-
+The meta-data (which is what we're looking at in the table above) is distributed to all ranges in the cluster.  Be aware that the national_id `555-02-2531` is clear text visible on very node in the cluster.    The point is to be very careful of the data we use as PKeys or in indexes.  
 
 # Appendix
 
